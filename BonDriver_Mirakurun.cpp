@@ -53,6 +53,35 @@ static int Init(HMODULE hModule)
 
 	setlocale(LC_ALL, "japanese");
 
+	g_MagicPacket_Enable = GetPrivateProfileInt(L"GLOBAL", L"MAGICPACKET_ENABLE", 0, g_IniFilePath);
+
+	if (g_MagicPacket_Enable) {
+		wchar_t tmpMagicPacket_TargetMAC[18];
+		GetPrivateProfileString(L"GLOBAL", L"MAGICPACKET_TARGETMAC", L"00:00:00:00:00:00", tmpMagicPacket_TargetMAC, sizeof(tmpMagicPacket_TargetMAC), g_IniFilePath);
+		wcstombs_s(&ret, g_MagicPacket_TargetMAC, tmpMagicPacket_TargetMAC, sizeof(g_MagicPacket_TargetMAC));
+
+
+		for (int i = 0; i < 6; i++) {
+			BYTE b = 0;
+			char *p = &g_MagicPacket_TargetMAC[i * 3];
+			for (int j = 0; j < 2; j++) {
+				if (*p >= '0' && *p <= '9') {
+					b = b * 0x10 + (*p - '0');
+				} else if (*p >= 'a' && *p <= 'f') {
+					b = b * 0x10 + (10 + *p - 'a');
+				} else if (*p >= 'A' && *p <= 'F') {
+					b = b * 0x10 + (10 + *p - 'A');
+				}
+				p++;
+			}
+			g_MagicPacket_TargetMAC[i] = b;
+		}
+		wchar_t tmpMagicPacket_TargetIP[16];
+		GetPrivateProfileString(L"GLOBAL", L"MAGICPACKET_TARGETIP", L"0.0.0.0", tmpMagicPacket_TargetIP, sizeof(tmpMagicPacket_TargetIP), g_IniFilePath);
+		wcstombs_s(&ret, g_MagicPacket_TargetIP, tmpMagicPacket_TargetIP, sizeof(g_MagicPacket_TargetIP));
+
+	}
+
 	return 0;
 }
 
@@ -153,6 +182,23 @@ const BOOL CBonTuner::OpenTuner()
 		WSADATA stWsa;
 		if (WSAStartup(MAKEWORD(2,2), &stWsa) != 0) {
 			return FALSE;
+		}
+		if (g_MagicPacket_Enable) {
+			char magicpacket[102];
+			memset(&magicpacket, 0xff, 6);
+			for (int i = 0; i < 16; i++) {
+				memcpy(&magicpacket[i * 6 + 6], g_MagicPacket_TargetMAC, 6);
+			}
+			SOCKET s = socket(PF_INET, SOCK_DGRAM, 0);
+			if (s == SOCKET_ERROR) {
+				return FALSE;
+			}
+			SOCKADDR_IN addr;
+			addr.sin_family = AF_INET;
+			addr.sin_port = htons(9);
+			addr.sin_addr.S_un.S_addr = inet_addr(g_MagicPacket_TargetIP);
+
+			sendto(s, magicpacket, sizeof(magicpacket), 0, (LPSOCKADDR)&addr, sizeof(addr));
 		}
 
 		m_bTunerOpen = true;
