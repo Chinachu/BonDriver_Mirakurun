@@ -335,7 +335,7 @@ void CBonTuner::Release()
 LPCTSTR CBonTuner::GetTunerName(void)
 {
 	// チューナ名を返す
-	return TEXT("HTTP/IPv4");
+	return TEXT(TUNER_NAME);
 }
 
 const BOOL CBonTuner::IsTunerOpening(void)
