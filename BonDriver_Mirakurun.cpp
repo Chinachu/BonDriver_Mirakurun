@@ -1,4 +1,4 @@
-#include "BonDriver_Mirakurun.h"
+﻿#include "BonDriver_Mirakurun.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -199,6 +199,84 @@ const BOOL CBonTuner::OpenTuner()
 			addr.sin_addr.S_un.S_addr = inet_addr(g_MagicPacket_TargetIP);
 
 			sendto(s, magicpacket, sizeof(magicpacket), 0, (LPSOCKADDR)&addr, sizeof(addr));
+
+			DWORD dwLastTime = ::GetTickCount();
+			for (int i = 0; i < 20; i++) {
+				try {
+					char serverRequest[256];
+
+					WCHAR tmpServerRequest[256];
+
+					wsprintf(tmpServerRequest, L"GET / HTTP/1.0\r\n\r\n");
+
+					size_t i;
+					wcstombs_s(&i, serverRequest, tmpServerRequest, sizeof(serverRequest));
+
+					struct addrinfo hints;
+					struct addrinfo* res = NULL;
+					struct addrinfo* ai;
+
+					memset(&hints, 0, sizeof(hints));
+					hints.ai_family = AF_INET6;	//IPv6優先
+					hints.ai_socktype = SOCK_STREAM;
+					hints.ai_protocol = IPPROTO_TCP;
+					hints.ai_flags = AI_NUMERICSERV;
+					if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+						//printf("getaddrinfo(): %s\n", gai_strerror(err));
+						hints.ai_family = AF_INET;	//IPv4限定
+						if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+							throw 1UL;
+						}
+					}
+
+					for (ai = res; ai; ai = ai->ai_next) {
+						m_sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+						if (m_sock == INVALID_SOCKET) {
+							continue;
+						}
+
+						if (connect(m_sock, ai->ai_addr, ai->ai_addrlen) >= 0) {
+							// OK
+							break;
+						}
+						closesocket(m_sock);
+						m_sock = INVALID_SOCKET;
+					}
+					freeaddrinfo(res);
+
+					if (m_sock == INVALID_SOCKET) {
+						TCHAR szDebugOut[128];
+						::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() connection error %d\n"), TUNER_NAME, WSAGetLastError());
+						::OutputDebugString(szDebugOut);
+						throw 1UL;
+					}
+
+					if (send(m_sock, serverRequest, (int)strlen(serverRequest), 0) < 0) {
+						TCHAR szDebugOut[128];
+						::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() send error %d\n"), TUNER_NAME, WSAGetLastError());
+						::OutputDebugString(szDebugOut);
+						throw 1UL;
+					}
+					m_bTunerOpen = true;
+					return TRUE;
+				}
+				catch (const DWORD dwErrorStep) {
+					if (::GetTickCount() - dwLastTime > 20000) {
+						TCHAR szDebugOut[1024];
+						::wsprintf(szDebugOut, TEXT("TimeOut\n"));
+						::OutputDebugString(szDebugOut);
+						return FALSE;
+					}
+					// エラー発生
+					TCHAR szDebugOut[1024];
+					::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() dwErrorStep = %lu\n"), TUNER_NAME, dwErrorStep);
+					::OutputDebugString(szDebugOut);
+					Sleep(1000);
+				}
+			}
+
+			return FALSE;
+
 		}
 
 		m_bTunerOpen = true;
