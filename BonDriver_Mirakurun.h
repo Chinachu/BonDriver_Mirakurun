@@ -25,6 +25,7 @@ static wchar_t g_IniFilePath[MAX_PATH] = { '\0' };
 static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
+static int g_Priority;
 
 class CBonTuner : public IBonDriver2
 {
