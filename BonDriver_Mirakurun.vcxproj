@@ -179,9 +179,12 @@
     <ClCompile Include="BonDriver_Mirakurun.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="binzume\http.h" />
+    <ClInclude Include="binzume\socket.h" />
     <ClInclude Include="BonDriver_Mirakurun.h" />
     <ClInclude Include="IBonDriver.h" />
     <ClInclude Include="IBonDriver2.h" />
+    <ClInclude Include="picojson\picojson.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

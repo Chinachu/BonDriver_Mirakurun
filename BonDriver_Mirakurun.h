@@ -2,6 +2,11 @@
 #include <ws2tcpip.h>
 #include <InitGuid.h>
 #include "IBonDriver2.h"
+#include "binzume\socket.h"
+#include "binzume\http.h"
+#include "picojson\picojson.h"
+using namespace std;
+using namespace Net;
 
 #if !defined(_BONTUNER_H_)
 #define _BONTUNER_H_
@@ -26,6 +31,9 @@ static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
 static int g_Priority;
+picojson::value g_Channel_JSON_GR;
+picojson::value g_Channel_JSON_BS;
+picojson::value g_Channel_JSON_CS;
 
 class CBonTuner : public IBonDriver2
 {
@@ -118,6 +126,7 @@ protected:
 	float m_fBitRate;
 
 	void CalcBitRate();
+	void GetApiChannels(const char* space, picojson::value *json_array);
 	DWORD m_dwRecvBytes;
 	DWORD m_dwLastCalcTick;
 	ULONGLONG m_u64RecvBytes;

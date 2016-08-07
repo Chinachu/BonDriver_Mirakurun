@@ -15,6 +15,15 @@
     <ClInclude Include="BonDriver_Mirakurun.h">
       <Filter>ヘッダファイル</Filter>
     </ClInclude>
+    <ClInclude Include="picojson\picojson.h">
+      <Filter>ヘッダファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="binzume\http.h">
+      <Filter>ヘッダファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="binzume\socket.h">
+      <Filter>ヘッダファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ソースファイル">
