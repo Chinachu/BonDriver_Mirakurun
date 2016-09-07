@@ -258,6 +258,11 @@ const BOOL CBonTuner::OpenTuner()
 						throw 1UL;
 					}
 					m_bTunerOpen = true;
+
+					// Mirakurun APIよりchannel取得
+					GetApiChannels("GR", &g_Channel_JSON_GR);
+					GetApiChannels("BS", &g_Channel_JSON_BS);
+					GetApiChannels("CS", &g_Channel_JSON_CS);
 					return TRUE;
 				}
 				catch (const DWORD dwErrorStep) {
