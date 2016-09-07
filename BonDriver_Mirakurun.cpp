@@ -1,4 +1,4 @@
-#include "BonDriver_Mirakurun.h"
+﻿#include "BonDriver_Mirakurun.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -52,6 +52,35 @@ static int Init(HMODULE hModule)
 	g_Priority = GetPrivateProfileInt(L"GLOBAL", L"PRIORITY", 0, g_IniFilePath);
 
 	setlocale(LC_ALL, "japanese");
+
+	g_MagicPacket_Enable = GetPrivateProfileInt(L"GLOBAL", L"MAGICPACKET_ENABLE", 0, g_IniFilePath);
+
+	if (g_MagicPacket_Enable) {
+		wchar_t tmpMagicPacket_TargetMAC[18];
+		GetPrivateProfileString(L"GLOBAL", L"MAGICPACKET_TARGETMAC", L"00:00:00:00:00:00", tmpMagicPacket_TargetMAC, sizeof(tmpMagicPacket_TargetMAC), g_IniFilePath);
+		wcstombs_s(&ret, g_MagicPacket_TargetMAC, tmpMagicPacket_TargetMAC, sizeof(g_MagicPacket_TargetMAC));
+
+
+		for (int i = 0; i < 6; i++) {
+			BYTE b = 0;
+			char *p = &g_MagicPacket_TargetMAC[i * 3];
+			for (int j = 0; j < 2; j++) {
+				if (*p >= '0' && *p <= '9') {
+					b = b * 0x10 + (*p - '0');
+				} else if (*p >= 'a' && *p <= 'f') {
+					b = b * 0x10 + (10 + *p - 'a');
+				} else if (*p >= 'A' && *p <= 'F') {
+					b = b * 0x10 + (10 + *p - 'A');
+				}
+				p++;
+			}
+			g_MagicPacket_TargetMAC[i] = b;
+		}
+		wchar_t tmpMagicPacket_TargetIP[16];
+		GetPrivateProfileString(L"GLOBAL", L"MAGICPACKET_TARGETIP", L"0.0.0.0", tmpMagicPacket_TargetIP, sizeof(tmpMagicPacket_TargetIP), g_IniFilePath);
+		wcstombs_s(&ret, g_MagicPacket_TargetIP, tmpMagicPacket_TargetIP, sizeof(g_MagicPacket_TargetIP));
+
+	}
 
 	return 0;
 }
@@ -153,6 +182,106 @@ const BOOL CBonTuner::OpenTuner()
 		WSADATA stWsa;
 		if (WSAStartup(MAKEWORD(2,2), &stWsa) != 0) {
 			return FALSE;
+		}
+		if (g_MagicPacket_Enable) {
+			char magicpacket[102];
+			memset(&magicpacket, 0xff, 6);
+			for (int i = 0; i < 16; i++) {
+				memcpy(&magicpacket[i * 6 + 6], g_MagicPacket_TargetMAC, 6);
+			}
+			SOCKET s = socket(PF_INET, SOCK_DGRAM, 0);
+			if (s == SOCKET_ERROR) {
+				return FALSE;
+			}
+			SOCKADDR_IN addr;
+			addr.sin_family = AF_INET;
+			addr.sin_port = htons(9);
+			addr.sin_addr.S_un.S_addr = inet_addr(g_MagicPacket_TargetIP);
+
+			sendto(s, magicpacket, sizeof(magicpacket), 0, (LPSOCKADDR)&addr, sizeof(addr));
+
+			DWORD dwLastTime = ::GetTickCount();
+			for (int i = 0; i < 20; i++) {
+				try {
+					char serverRequest[256];
+
+					WCHAR tmpServerRequest[256];
+
+					wsprintf(tmpServerRequest, L"GET / HTTP/1.0\r\n\r\n");
+
+					size_t i;
+					wcstombs_s(&i, serverRequest, tmpServerRequest, sizeof(serverRequest));
+
+					struct addrinfo hints;
+					struct addrinfo* res = NULL;
+					struct addrinfo* ai;
+
+					memset(&hints, 0, sizeof(hints));
+					hints.ai_family = AF_INET6;	//IPv6優先
+					hints.ai_socktype = SOCK_STREAM;
+					hints.ai_protocol = IPPROTO_TCP;
+					hints.ai_flags = AI_NUMERICSERV;
+					if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+						//printf("getaddrinfo(): %s\n", gai_strerror(err));
+						hints.ai_family = AF_INET;	//IPv4限定
+						if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+							throw 1UL;
+						}
+					}
+
+					for (ai = res; ai; ai = ai->ai_next) {
+						m_sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+						if (m_sock == INVALID_SOCKET) {
+							continue;
+						}
+
+						if (connect(m_sock, ai->ai_addr, ai->ai_addrlen) >= 0) {
+							// OK
+							break;
+						}
+						closesocket(m_sock);
+						m_sock = INVALID_SOCKET;
+					}
+					freeaddrinfo(res);
+
+					if (m_sock == INVALID_SOCKET) {
+						TCHAR szDebugOut[128];
+						::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() connection error %d\n"), TUNER_NAME, WSAGetLastError());
+						::OutputDebugString(szDebugOut);
+						throw 1UL;
+					}
+
+					if (send(m_sock, serverRequest, (int)strlen(serverRequest), 0) < 0) {
+						TCHAR szDebugOut[128];
+						::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() send error %d\n"), TUNER_NAME, WSAGetLastError());
+						::OutputDebugString(szDebugOut);
+						throw 1UL;
+					}
+					m_bTunerOpen = true;
+
+					// Mirakurun APIよりchannel取得
+					GetApiChannels("GR", &g_Channel_JSON_GR);
+					GetApiChannels("BS", &g_Channel_JSON_BS);
+					GetApiChannels("CS", &g_Channel_JSON_CS);
+					return TRUE;
+				}
+				catch (const DWORD dwErrorStep) {
+					if (::GetTickCount() - dwLastTime > 20000) {
+						TCHAR szDebugOut[1024];
+						::wsprintf(szDebugOut, TEXT("TimeOut\n"));
+						::OutputDebugString(szDebugOut);
+						return FALSE;
+					}
+					// エラー発生
+					TCHAR szDebugOut[1024];
+					::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() dwErrorStep = %lu\n"), TUNER_NAME, dwErrorStep);
+					::OutputDebugString(szDebugOut);
+					Sleep(1000);
+				}
+			}
+
+			return FALSE;
+
 		}
 
 		m_bTunerOpen = true;
