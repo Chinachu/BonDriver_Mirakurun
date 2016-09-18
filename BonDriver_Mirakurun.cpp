@@ -201,7 +201,8 @@ const BOOL CBonTuner::OpenTuner()
 			sendto(s, magicpacket, sizeof(magicpacket), 0, (LPSOCKADDR)&addr, sizeof(addr));
 
 			DWORD dwLastTime = ::GetTickCount();
-			for (int i = 0; i < 20; i++) {
+			int countdown = 0;
+			for (int countdown = 0; countdown < MAGICPACKET_WAIT_SECONDS; countdown++) {
 				try {
 					char serverRequest[256];
 
@@ -257,16 +258,12 @@ const BOOL CBonTuner::OpenTuner()
 						::OutputDebugString(szDebugOut);
 						throw 1UL;
 					}
-					m_bTunerOpen = true;
 
-					// Mirakurun APIよりchannel取得
-					GetApiChannels("GR", &g_Channel_JSON_GR);
-					GetApiChannels("BS", &g_Channel_JSON_BS);
-					GetApiChannels("CS", &g_Channel_JSON_CS);
-					return TRUE;
+					// Success
+					break;
 				}
 				catch (const DWORD dwErrorStep) {
-					if (::GetTickCount() - dwLastTime > 20000) {
+					if (::GetTickCount() - dwLastTime > (MAGICPACKET_WAIT_SECONDS * 1000)) {
 						TCHAR szDebugOut[1024];
 						::wsprintf(szDebugOut, TEXT("TimeOut\n"));
 						::OutputDebugString(szDebugOut);
@@ -280,8 +277,10 @@ const BOOL CBonTuner::OpenTuner()
 				}
 			}
 
-			return FALSE;
-
+			if (countdown >= MAGICPACKET_WAIT_SECONDS) {
+				// Failed
+				return FALSE;
+			}
 		}
 
 		m_bTunerOpen = true;
@@ -291,7 +290,6 @@ const BOOL CBonTuner::OpenTuner()
 		GetApiChannels("BS", &g_Channel_JSON_BS);
 		GetApiChannels("CS", &g_Channel_JSON_CS);
 	}
-
 
 	//return SetChannel(0UL,0UL);
 	
@@ -926,7 +924,7 @@ void CBonTuner::CalcBitRate()
 	return;
 }
 
-void CBonTuner::GetApiChannels(const char* space, picojson::value *channel_json)
+void CBonTuner::GetApiChannels(const char* space, picojson::value* channel_json)
 {
 	HttpClient client;
 	char url[512];
