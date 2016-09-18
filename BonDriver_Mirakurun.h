@@ -34,6 +34,9 @@ static int g_Priority;
 picojson::value g_Channel_JSON_GR;
 picojson::value g_Channel_JSON_BS;
 picojson::value g_Channel_JSON_CS;
+static int g_MagicPacket_Enable;
+static char g_MagicPacket_TargetMAC[18];
+static char g_MagicPacket_TargetIP[16];
 
 class CBonTuner : public IBonDriver2
 {
