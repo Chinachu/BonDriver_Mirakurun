@@ -289,6 +289,7 @@ const BOOL CBonTuner::OpenTuner()
 		GetApiChannels("GR", &g_Channel_JSON_GR);
 		GetApiChannels("BS", &g_Channel_JSON_BS);
 		GetApiChannels("CS", &g_Channel_JSON_CS);
+		GetApiChannels("SKY", &g_Channel_JSON_SKY);
 	}
 
 	//return SetChannel(0UL,0UL);
@@ -499,6 +500,8 @@ LPCTSTR CBonTuner::EnumTuningSpace(const DWORD dwSpace)
 			return TEXT("BS");
 		case 2UL:
 			return TEXT("CS");
+		case 3UL:
+			return TEXT("SKY");
 		default  :
 			return NULL;
 	}
@@ -515,6 +518,8 @@ LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 		channel_json = g_Channel_JSON_BS;
 	} else if (space_str == L"CS") {
 		channel_json = g_Channel_JSON_CS;
+	} else if (space_str == L"SKY") {
+		channel_json = g_Channel_JSON_SKY;
 	} else {
 		return NULL;
 	}
@@ -751,6 +756,9 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 	}
 	else if (space_str == L"CS") {
 		channel_json = g_Channel_JSON_CS;
+	}
+	else if (space_str == L"SKY") {
+		channel_json = g_Channel_JSON_SKY;
 	}
 	else {
 		return NULL;
