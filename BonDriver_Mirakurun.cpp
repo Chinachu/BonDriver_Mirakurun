@@ -202,7 +202,7 @@ const BOOL CBonTuner::OpenTuner()
 
 			DWORD dwLastTime = ::GetTickCount();
 			int countdown = 0;
-			for (int countdown = 0; countdown < MAGICPACKET_WAIT_SECONDS; countdown++) {
+			for (countdown = 0; countdown < MAGICPACKET_WAIT_SECONDS; countdown++) {
 				try {
 					char serverRequest[256];
 
