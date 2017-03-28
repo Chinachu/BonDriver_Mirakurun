@@ -1,3 +1,6 @@
+﻿#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <InitGuid.h>
@@ -31,10 +34,7 @@ static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
 static int g_Priority;
-picojson::value g_Channel_JSON_GR;
-picojson::value g_Channel_JSON_BS;
-picojson::value g_Channel_JSON_CS;
-picojson::value g_Channel_JSON_SKY;
+picojson::value g_Channel_JSON[4];
 static int g_MagicPacket_Enable;
 static char g_MagicPacket_TargetMAC[18];
 static char g_MagicPacket_TargetIP[16];

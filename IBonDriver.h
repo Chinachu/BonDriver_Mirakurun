@@ -1,4 +1,4 @@
-// IBonDriver.h: IBonDriver クラスのインターフェイス
+﻿// IBonDriver.h: IBonDriver クラスのインターフェイス
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -30,10 +30,6 @@ class IBonDriver
 
 	virtual void Release(void) = 0;
 };
-
-
-// インスタンス生成メソッド
-extern "C" __declspec(dllimport) IBonDriver * CreateBonDriver();
 
 
 #endif // !defined(_IBONDRIVER_H_)

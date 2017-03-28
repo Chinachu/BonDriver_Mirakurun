@@ -120,7 +120,7 @@ public:
 
 		if (method==POST || method==AUTO&&data.size()) {
 			char s[30];
-			sprintf(s,"Content-Length: %d\r\n", data.size());
+			sprintf(s,"Content-Length: %zd\r\n", data.size());
 			soc.write(s);
 			soc.write("Content-Type: application/x-www-form-urlencoded\r\n");
 		}
@@ -140,7 +140,7 @@ public:
 
 		std::string line;
 		line = soc.readLine(); // HTTP status
-		int p=line.find(" ");
+		size_t p=line.find(" ");
 		if (p!=std::string::npos) {
 			status = atoi(line.c_str()+p+1);
 		}
@@ -152,7 +152,7 @@ public:
 			if (line.size()==0) break;
 			if (line.size() && line[line.size()-1]=='\r') line.resize(line.size()-1);
 			if (line.empty()) break;
-			int p=line.find(":");
+			size_t p=line.find(":");
 			std::string name=line.substr(0, p);
 			if (line[p+1]==' ') p++;
 			std::string value=line.substr(p+1);
@@ -178,7 +178,7 @@ public:
 		using namespace std;
 		int s=0;
 		if (url.substr(0,7)=="http://") s=7;
-		int p=url.find("/",s);
+		size_t p=url.find("/",s);
 		string host = url.substr(s, p-s);
 		string path = url.substr(p);
 		int port=80;
@@ -192,7 +192,7 @@ public:
 	}
 
 	// old method
-	int load(const std::string &url, const std::string &data="")
+	size_t load(const std::string &url, const std::string &data="")
 	{
 		Socket soc = request(url, data);
 		while(!soc.error()) {
@@ -203,7 +203,7 @@ public:
 	}
 
 	// old method
-	int load(const std::string &url, const std::map<std::string,std::string> &params)
+	size_t load(const std::string &url, const std::map<std::string,std::string> &params)
 	{
 		std::string data;
 		for (std::map<std::string,std::string>::const_iterator it = params.begin();it!=params.end();++it) {

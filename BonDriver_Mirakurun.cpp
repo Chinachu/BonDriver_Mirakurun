@@ -286,10 +286,10 @@ const BOOL CBonTuner::OpenTuner()
 		m_bTunerOpen = true;
 
 		// Mirakurun APIよりchannel取得
-		GetApiChannels("GR", &g_Channel_JSON_GR);
-		GetApiChannels("BS", &g_Channel_JSON_BS);
-		GetApiChannels("CS", &g_Channel_JSON_CS);
-		GetApiChannels("SKY", &g_Channel_JSON_SKY);
+		GetApiChannels("GR", &g_Channel_JSON[0]);
+		GetApiChannels("BS", &g_Channel_JSON[1]);
+		GetApiChannels("CS", &g_Channel_JSON[2]);
+		GetApiChannels("SKY", &g_Channel_JSON[3]);
 	}
 
 	//return SetChannel(0UL,0UL);
@@ -512,17 +512,10 @@ LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 	picojson::value channel_json;
 	LPCTSTR space_str = CBonTuner::EnumTuningSpace(dwSpace);
 
-	if (space_str == L"GR") {
-		channel_json = g_Channel_JSON_GR;
-	} else if (space_str == L"BS") {
-		channel_json = g_Channel_JSON_BS;
-	} else if (space_str == L"CS") {
-		channel_json = g_Channel_JSON_CS;
-	} else if (space_str == L"SKY") {
-		channel_json = g_Channel_JSON_SKY;
-	} else {
+	if (dwSpace > 3) {
 		return NULL;
 	}
+	channel_json = g_Channel_JSON[dwSpace];
 
 	if (channel_json.is<picojson::array>() == false
 		|| channel_json.get<picojson::array>().empty()
@@ -748,21 +741,10 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 	picojson::value channel_json;
 	LPCTSTR space_str = CBonTuner::EnumTuningSpace(dwSpace);
 
-	if (space_str == L"GR") {
-		channel_json = g_Channel_JSON_GR;
-	}
-	else if (space_str == L"BS") {
-		channel_json = g_Channel_JSON_BS;
-	}
-	else if (space_str == L"CS") {
-		channel_json = g_Channel_JSON_CS;
-	}
-	else if (space_str == L"SKY") {
-		channel_json = g_Channel_JSON_SKY;
-	}
-	else {
+	if (dwSpace > 3) {
 		return NULL;
 	}
+	channel_json = g_Channel_JSON[dwSpace];
 
 	if (channel_json.is<picojson::array>() == false
 		|| channel_json.get<picojson::array>().empty()
@@ -796,7 +778,6 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 		char serverRequest[256];
 
 		// tmp
-		wchar_t tmpString[128];
 		wchar_t tmpUrl[128];
 
 		WCHAR tmpServerRequest[256];

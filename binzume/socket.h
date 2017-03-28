@@ -134,7 +134,6 @@ public:
 		if(m_socket==INVALID_SOCKET)
 			return false;
 
-		hostent he;
 		sockaddr_in addr;
 		in_addr inaddr;
 
