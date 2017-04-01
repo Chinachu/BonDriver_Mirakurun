@@ -157,6 +157,18 @@ CBonTuner::CBonTuner()
 
 	// クリティカルセクション初期化
 	::InitializeCriticalSection(&m_CriticalSection);
+
+	// Mirakurun APIよりchannel取得
+	int i = 0;
+	TCHAR buf[4];
+	for (int j = 0; j < 4; j++) {
+		GetApiChannels(Space_Name[j], &g_Channel_JSON[i]);
+		if (g_Channel_JSON[i].contains(0) == true) {
+			_stprintf(buf, TEXT("%hs"), Space_Name[j]);
+			_tcscpy(g_Space_Set[i], buf);
+			i++;
+		}
+	}
 }
 
 CBonTuner::~CBonTuner()
@@ -284,12 +296,6 @@ const BOOL CBonTuner::OpenTuner()
 		}
 
 		m_bTunerOpen = true;
-
-		// Mirakurun APIよりchannel取得
-		GetApiChannels("GR", &g_Channel_JSON_GR);
-		GetApiChannels("BS", &g_Channel_JSON_BS);
-		GetApiChannels("CS", &g_Channel_JSON_CS);
-		GetApiChannels("SKY", &g_Channel_JSON_SKY);
 	}
 
 	//return SetChannel(0UL,0UL);
@@ -492,37 +498,27 @@ const BOOL CBonTuner::IsTunerOpening(void)
 
 LPCTSTR CBonTuner::EnumTuningSpace(const DWORD dwSpace)
 {
-	// 使用可能なチューニング空間を返す
-	switch (dwSpace) {
-		case 0UL :
-			return TEXT("GR");
-		case 1UL :
-			return TEXT("BS");
-		case 2UL:
-			return TEXT("CS");
-		case 3UL:
-			return TEXT("SKY");
-		default  :
-			return NULL;
+	if (dwSpace > 3) {
+		return NULL;
 	}
+	if (g_Channel_JSON[dwSpace].is<picojson::array>() == false
+		|| g_Channel_JSON[dwSpace].get<picojson::array>().empty()
+	|| g_Channel_JSON[dwSpace].contains(0) == false) {
+		return NULL;
+	}
+
+	// 使用可能なチューニング空間を返す
+	return g_Space_Set[dwSpace];
 }
 
 LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 {
 	picojson::value channel_json;
-	LPCTSTR space_str = CBonTuner::EnumTuningSpace(dwSpace);
 
-	if (space_str == L"GR") {
-		channel_json = g_Channel_JSON_GR;
-	} else if (space_str == L"BS") {
-		channel_json = g_Channel_JSON_BS;
-	} else if (space_str == L"CS") {
-		channel_json = g_Channel_JSON_CS;
-	} else if (space_str == L"SKY") {
-		channel_json = g_Channel_JSON_SKY;
-	} else {
+	if (dwSpace > 3) {
 		return NULL;
 	}
+	channel_json = g_Channel_JSON[dwSpace];
 
 	if (channel_json.is<picojson::array>() == false
 		|| channel_json.get<picojson::array>().empty()
@@ -745,24 +741,12 @@ const BOOL CBonTuner::SetChannel(const BYTE bCh)
 // チャンネル設定
 const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 {
-	picojson::value channel_json;
-	LPCTSTR space_str = CBonTuner::EnumTuningSpace(dwSpace);
-
-	if (space_str == L"GR") {
-		channel_json = g_Channel_JSON_GR;
-	}
-	else if (space_str == L"BS") {
-		channel_json = g_Channel_JSON_BS;
-	}
-	else if (space_str == L"CS") {
-		channel_json = g_Channel_JSON_CS;
-	}
-	else if (space_str == L"SKY") {
-		channel_json = g_Channel_JSON_SKY;
-	}
-	else {
+	if (dwSpace > 3) {
 		return NULL;
 	}
+
+	picojson::value channel_json;
+	channel_json = g_Channel_JSON[dwSpace];
 
 	if (channel_json.is<picojson::array>() == false
 		|| channel_json.get<picojson::array>().empty()
@@ -796,7 +780,6 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 		char serverRequest[256];
 
 		// tmp
-		wchar_t tmpString[128];
 		wchar_t tmpUrl[128];
 
 		WCHAR tmpServerRequest[256];

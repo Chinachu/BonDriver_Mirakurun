@@ -1,3 +1,7 @@
+﻿#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
+#include <tchar.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <InitGuid.h>
@@ -24,6 +28,7 @@ using namespace Net;
 #define TSDATASIZE	48128	// TSデータのサイズ 188 * 256
 
 static wchar_t g_IniFilePath[MAX_PATH] = { '\0' };
+const char *Space_Name[] = { "GR", "BS", "CS", "SKY" };
 
 #define MAX_HOST_LEN	256
 #define MAX_PORT_LEN	8
@@ -31,13 +36,11 @@ static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
 static int g_Priority;
-picojson::value g_Channel_JSON_GR;
-picojson::value g_Channel_JSON_BS;
-picojson::value g_Channel_JSON_CS;
-picojson::value g_Channel_JSON_SKY;
+picojson::value g_Channel_JSON[4];
 static int g_MagicPacket_Enable;
 static char g_MagicPacket_TargetMAC[18];
 static char g_MagicPacket_TargetIP[16];
+static TCHAR g_Space_Set[4][4];
 #define MAGICPACKET_WAIT_SECONDS 20
 
 class CBonTuner : public IBonDriver2
