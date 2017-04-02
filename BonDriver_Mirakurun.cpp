@@ -135,7 +135,7 @@ CBonTuner * CBonTuner::m_pThis = NULL;
 HINSTANCE CBonTuner::m_hModule = NULL;
 
 CBonTuner::CBonTuner()
-	: m_bTunerOpen(false)
+	: m_bTunerOpen(FALSE)
 	, m_hMutex(NULL)
 	, m_pIoReqBuff(NULL)
 	, m_pIoPushReq(NULL)
@@ -155,26 +155,32 @@ CBonTuner::CBonTuner()
 {
 	m_pThis = this;
 
+	// グローバル変数初期化
+	for (int i = 0; i < SPACE_NUM; i++) {
+		g_pType[i] = NULL;
+	}
+	
 	// クリティカルセクション初期化
 	::InitializeCriticalSection(&m_CriticalSection);
 
-	// Mirakurun APIよりchannel取得
-	int i = 0;
-	TCHAR buf[4];
-	for (int j = 0; j < 4; j++) {
-		GetApiChannels(Space_Name[j], &g_Channel_JSON[i]);
-		if (g_Channel_JSON[i].contains(0) == true) {
-			_stprintf(buf, TEXT("%hs"), Space_Name[j]);
-			_tcscpy(g_Space_Set[i], buf);
-			i++;
-		}
-	}
+	//Initialize channel
+	InitChannel();
 }
 
 CBonTuner::~CBonTuner()
 {
 	// 開かれてる場合は閉じる
 	CloseTuner();
+
+	// メモリ解放
+	for (int i = 0; i < SPACE_NUM; i++) {
+		if (g_pType[i]) {
+			free(g_pType[i]);
+		}
+		else {
+			break;
+		}
+	}
 
 	// クリティカルセクション削除
 	::DeleteCriticalSection(&m_CriticalSection);
@@ -187,8 +193,56 @@ CBonTuner::~CBonTuner()
 	m_pThis = NULL;
 }
 
+void CBonTuner::InitChannel()
+{
+	// Mirakurun APIよりchannel取得
+	GetApiChannels(&g_Channel_JSON);
+	if (g_Channel_JSON.is<picojson::null>()) {
+		return;
+	}
+	if (!g_Channel_JSON.contains(0)) {
+		return;
+	}
+
+	// チューナ空間取得
+	int i = 0;
+	int j = 0;
+	while (j < SPACE_NUM - 1) {
+		if (!g_Channel_JSON.contains(i)) {
+			break;
+		}
+		picojson::object& channel_obj = g_Channel_JSON.get(i).get<picojson::object>();
+		const char *type;
+		type = channel_obj["type"].get<std::string>().c_str();
+		if (!g_pType[0]) {
+			int len = (int)strlen(type) + 1;
+			g_pType[0] = (char *)malloc(len);
+			if (!g_pType[0]) {
+				break;
+			}
+			strcpy_s(g_pType[0], len, type);
+		}
+		else if (strcmp(g_pType[j], type)) {
+			int len = (int)strlen(type) + 1;
+			g_pType[++j] = (char *)malloc(len);
+			if (!g_pType[j]) {
+				j--;
+				break;
+			}
+			strcpy_s(g_pType[j], len, type);
+			g_Channel_Base[j] = i;
+		}
+		i++;
+	}
+	g_Max_Type = j;
+}
+
 const BOOL CBonTuner::OpenTuner()
 {
+	if (g_Channel_JSON.is<picojson::null>()) {
+		return FALSE;
+	}
+
 	if (!m_bTunerOpen) {
 		// Winsock初期化
 		WSADATA stWsa;
@@ -248,7 +302,7 @@ const BOOL CBonTuner::OpenTuner()
 							continue;
 						}
 
-						if (connect(m_sock, ai->ai_addr, ai->ai_addrlen) >= 0) {
+						if (connect(m_sock, ai->ai_addr, (int)ai->ai_addrlen) >= 0) {
 							// OK
 							break;
 						}
@@ -295,7 +349,7 @@ const BOOL CBonTuner::OpenTuner()
 			}
 		}
 
-		m_bTunerOpen = true;
+		m_bTunerOpen = TRUE;
 	}
 
 	//return SetChannel(0UL,0UL);
@@ -498,39 +552,37 @@ const BOOL CBonTuner::IsTunerOpening(void)
 
 LPCTSTR CBonTuner::EnumTuningSpace(const DWORD dwSpace)
 {
-	if (dwSpace > 3) {
-		return NULL;
-	}
-	if (g_Channel_JSON[dwSpace].is<picojson::array>() == false
-		|| g_Channel_JSON[dwSpace].get<picojson::array>().empty()
-	|| g_Channel_JSON[dwSpace].contains(0) == false) {
+	if (dwSpace > g_Max_Type) {
 		return NULL;
 	}
 
 	// 使用可能なチューニング空間を返す
-	return g_Space_Set[dwSpace];
+	static TCHAR buf[128];
+	::MultiByteToWideChar(CP_UTF8, 0, g_pType[dwSpace], -1, buf, sizeof(buf) / 2);
+	return buf;
 }
 
 LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 {
-	picojson::value channel_json;
-
-	if (dwSpace > 3) {
+	if (dwSpace > g_Max_Type) {
 		return NULL;
 	}
-	channel_json = g_Channel_JSON[dwSpace];
+	if (dwSpace < g_Max_Type) {
+		if (dwChannel >= g_Channel_Base[dwSpace + 1] - g_Channel_Base[dwSpace]) {
+			return NULL;
+		}
+	}
 
-	if (channel_json.is<picojson::array>() == false
-		|| channel_json.get<picojson::array>().empty()
-		|| channel_json.contains(dwChannel) == false) {
+	DWORD Bon_Channel = dwChannel + g_Channel_Base[dwSpace];
+	if (!g_Channel_JSON.contains(Bon_Channel)) {
 		return NULL;
 	}
 
-	picojson::object& channel_obj = channel_json.get(dwChannel).get<picojson::object>();
-	std::string channel_name = channel_obj["name"].get<std::string>();
+	picojson::object& channel_obj = g_Channel_JSON.get(Bon_Channel).get<picojson::object>();
+	const char *channel_name = channel_obj["name"].get<std::string>().c_str();
 
 	static TCHAR buf[128];
-	mbstowcs(buf, channel_name.c_str(), sizeof(buf));
+	::MultiByteToWideChar(CP_UTF8, 0, channel_name, -1, buf, sizeof(buf) / 2);
 
 	return buf;
 }
@@ -741,25 +793,21 @@ const BOOL CBonTuner::SetChannel(const BYTE bCh)
 // チャンネル設定
 const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 {
-	if (dwSpace > 3) {
+	if (dwSpace > g_Max_Type) {
 		return NULL;
 	}
 
-	picojson::value channel_json;
-	channel_json = g_Channel_JSON[dwSpace];
-
-	if (channel_json.is<picojson::array>() == false
-		|| channel_json.get<picojson::array>().empty()
-		|| channel_json.contains(dwChannel) == false) {
+	DWORD Bon_Channel = dwChannel + g_Channel_Base[dwSpace];
+	if (!g_Channel_JSON.contains(Bon_Channel)) {
 		return NULL;
 	}
 
-	picojson::object& channel_obj = channel_json.get(dwChannel).get<picojson::object>();
-	std::string channel_name = channel_obj["name"].get<std::string>();
-	std::string channel = channel_obj["channel"].get<std::string>();
+	picojson::object& channel_obj = g_Channel_JSON.get(Bon_Channel).get<picojson::object>();
 
-	wchar_t wChannel[16];
-	mbstowcs(wChannel, channel.c_str(), sizeof(wChannel));
+	const char *type;
+	const char *channel;
+	type = channel_obj["type"].get<std::string>().c_str();
+	channel = channel_obj["channel"].get<std::string>().c_str();
 
 	// 一旦クローズ
 	CloseTuner();
@@ -777,20 +825,12 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 	m_dwReadyReqNum = 0;
 
 	try{
+		char url[128];
 		char serverRequest[256];
 
-		// tmp
-		wchar_t tmpUrl[128];
-
-		WCHAR tmpServerRequest[256];
-
 		// URL生成
-		wsprintf(tmpUrl, L"/api/channels/%s/%s/stream?decode=%d", CBonTuner::EnumTuningSpace(dwSpace), wChannel, g_DecodeB25);
-
-		wsprintf(tmpServerRequest, L"GET %s HTTP/1.0\r\nX-Mirakurun-Priority: %d\r\n\r\n", tmpUrl, g_Priority);
-
-		size_t i;
-		wcstombs_s(&i, serverRequest, tmpServerRequest, sizeof(serverRequest));
+		sprintf_s(url, "/api/channels/%s/%s/stream?decode=%d", type, channel, g_DecodeB25);
+		sprintf_s(serverRequest, "GET %s HTTP/1.0\r\nX-Mirakurun-Priority: %d\r\n\r\n", url, g_Priority);
 
 		struct addrinfo hints;
 		struct addrinfo* res = NULL;
@@ -815,7 +855,7 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 				continue;
 			}
 
-			if (connect(m_sock, ai->ai_addr, ai->ai_addrlen) >= 0) {
+			if (connect(m_sock, ai->ai_addr, (int)ai->ai_addrlen) >= 0) {
 				// OK
 				break;
 			}
@@ -915,11 +955,11 @@ void CBonTuner::CalcBitRate()
 	return;
 }
 
-void CBonTuner::GetApiChannels(const char* space, picojson::value* channel_json)
+void CBonTuner::GetApiChannels(picojson::value* channel_json)
 {
 	HttpClient client;
 	char url[512];
-	sprintf(url, "http://%s:%s/api/channels/%s", g_ServerHost, g_ServerPort, space);
+	sprintf_s(url, "http://%s:%s/api/channels", g_ServerHost, g_ServerPort);
 	HttpResponse response = client.get(url);
 
 	picojson::value v;
@@ -943,5 +983,4 @@ void CBonTuner::GetApiChannels(const char* space, picojson::value* channel_json)
 		}
 		*/
 	}
-
 }

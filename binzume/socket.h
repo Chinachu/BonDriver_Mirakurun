@@ -94,7 +94,7 @@ public:
 	Socket(const SOCKET &soc){m_socket = soc;}
 	Socket(const std::string &host,short port){
 		m_socket=socket(AF_INET, SOCK_STREAM, 0);
-		connect(host,port);
+		connect(host, port);
 	}
 	Socket(){m_socket=socket(AF_INET, SOCK_STREAM, 0);}
 
@@ -130,7 +130,7 @@ public:
 		return s;
 	}
 
-	bool connect(const std::string &host,short port){
+	bool connect(const std::string &host, short port){
 		if(m_socket==INVALID_SOCKET)
 			return false;
 
@@ -159,12 +159,12 @@ public:
 	}
 
 	int send(const void *buf,size_t len){
-		int ret=::send(m_socket,(const char*)buf,len,0);
+		int ret=::send(m_socket, (const char*)buf, (int)len, 0);
 		if (ret<1) close();
 		return ret;
 	}
 	int recv(void *buf,size_t len){
-		int ret=::recv(m_socket, (char*)buf, len, 0);
+		int ret=::recv(m_socket, (char*)buf, (int)len, 0);
 		if (ret<1) close();
 		return ret;
 	}
