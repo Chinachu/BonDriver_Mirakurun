@@ -1,5 +1,4 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+﻿#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <tchar.h>
 #include <winsock2.h>
@@ -28,7 +27,12 @@ using namespace Net;
 #define TSDATASIZE	48128	// TSデータのサイズ 188 * 256
 
 static wchar_t g_IniFilePath[MAX_PATH] = { '\0' };
-const char *Space_Name[] = { "GR", "BS", "CS", "SKY" };
+
+// チューナ空間
+#define SPACE_NUM 8
+static char *g_pType[SPACE_NUM];
+static DWORD g_Max_Type;
+static DWORD g_Channel_Base[SPACE_NUM];
 
 #define MAX_HOST_LEN	256
 #define MAX_PORT_LEN	8
@@ -36,7 +40,7 @@ static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
 static int g_Priority;
-picojson::value g_Channel_JSON[4];
+picojson::value g_Channel_JSON;
 static int g_MagicPacket_Enable;
 static char g_MagicPacket_TargetMAC[18];
 static char g_MagicPacket_TargetIP[16];
@@ -49,7 +53,10 @@ public:
 	CBonTuner();
 	virtual ~CBonTuner();
 
-// IBonDriver
+	// Initialize channel
+	void InitChannel(void);
+
+	// IBonDriver
 	const BOOL OpenTuner(void);
 	void CloseTuner(void);
 
@@ -134,13 +141,11 @@ protected:
 	float m_fBitRate;
 
 	void CalcBitRate();
-	void GetApiChannels(const char* space, picojson::value *json_array);
+	void GetApiChannels(picojson::value *json_array);
 	DWORD m_dwRecvBytes;
 	DWORD m_dwLastCalcTick;
 	ULONGLONG m_u64RecvBytes;
 	ULONGLONG m_u64LastCalcByte;
-
-
 };
 
 #endif // !defined(_BONTUNER_H_)
