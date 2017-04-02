@@ -146,8 +146,6 @@ protected:
 	DWORD m_dwLastCalcTick;
 	ULONGLONG m_u64RecvBytes;
 	ULONGLONG m_u64LastCalcByte;
-
-
 };
 
 #endif // !defined(_BONTUNER_H_)

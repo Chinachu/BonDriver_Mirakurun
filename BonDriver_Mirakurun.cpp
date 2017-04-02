@@ -135,7 +135,7 @@ CBonTuner * CBonTuner::m_pThis = NULL;
 HINSTANCE CBonTuner::m_hModule = NULL;
 
 CBonTuner::CBonTuner()
-	: m_bTunerOpen(false)
+	: m_bTunerOpen(FALSE)
 	, m_hMutex(NULL)
 	, m_pIoReqBuff(NULL)
 	, m_pIoPushReq(NULL)
@@ -197,8 +197,10 @@ void CBonTuner::InitChannel()
 {
 	// Mirakurun APIよりchannel取得
 	GetApiChannels(&g_Channel_JSON);
-	if (!g_Channel_JSON.is<picojson::array>()
-		|| g_Channel_JSON.get<picojson::array>().empty()) {
+	if (g_Channel_JSON.is<picojson::null>()) {
+		return;
+	}
+	if (!g_Channel_JSON.contains(0)) {
 		return;
 	}
 
@@ -237,6 +239,10 @@ void CBonTuner::InitChannel()
 
 const BOOL CBonTuner::OpenTuner()
 {
+	if (g_Channel_JSON.is<picojson::null>()) {
+		return FALSE;
+	}
+
 	if (!m_bTunerOpen) {
 		// Winsock初期化
 		WSADATA stWsa;
@@ -343,7 +349,7 @@ const BOOL CBonTuner::OpenTuner()
 			}
 		}
 
-		m_bTunerOpen = true;
+		m_bTunerOpen = TRUE;
 	}
 
 	//return SetChannel(0UL,0UL);
@@ -977,5 +983,4 @@ void CBonTuner::GetApiChannels(picojson::value* channel_json)
 		}
 		*/
 	}
-
 }
