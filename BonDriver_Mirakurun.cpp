@@ -530,7 +530,7 @@ LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 	std::string channel_name = channel_obj["name"].get<std::string>();
 
 	static TCHAR buf[128];
-	mbstowcs(buf, channel_name.c_str(), sizeof(buf));
+	::MultiByteToWideChar(CP_UTF8, 0, channel_name.c_str(), -1, buf, sizeof(buf));
 
 	return buf;
 }
