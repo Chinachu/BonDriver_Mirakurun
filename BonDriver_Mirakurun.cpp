@@ -957,9 +957,24 @@ void CBonTuner::CalcBitRate()
 
 void CBonTuner::GetApiChannels(picojson::value* channel_json)
 {
-	HttpClient client;
+	struct addrinfo hints;
+	struct addrinfo* res = NULL;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;	//IPv6優先
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+		hints.ai_family = AF_INET;	//IPv4限定
+		if (getaddrinfo(g_ServerHost, g_ServerPort, &hints, &res) != 0) {
+			return;
+		}
+	}
+
+	struct in_addr addr;
 	char url[512];
-	sprintf_s(url, "http://%s:%s/api/channels", g_ServerHost, g_ServerPort);
+	HttpClient client;
+	addr.s_addr = ((struct sockaddr_in *)(res->ai_addr))->sin_addr.s_addr;
+	sprintf_s(url, "http://%s:%s/api/channels", inet_ntoa(addr), g_ServerPort);
+	freeaddrinfo(res);
 	HttpResponse response = client.get(url);
 
 	picojson::value v;
