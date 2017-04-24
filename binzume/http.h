@@ -16,7 +16,7 @@ std::string urlencode(const std::string &str)
 		if (c>='A' && c<='Z' || c>='a' && c<='z' || c>='0' && c<='9') {
 			s+=c;
 		} else {
-			sprintf(h,"%%%02x",c);
+			sprintf_s(h,"%%%02x",c);
 			s+=h;
 		}
 	}
@@ -36,7 +36,7 @@ std::string urldecode(const std::string &str)
 			h[1]=*++it;
 			h[2]=0;
 			int d;
-			sscanf(h,"%02x",&d);
+			sscanf_s(h,"%02x",&d);
 			s+=(char)d;
 		}
 	}
@@ -120,7 +120,7 @@ public:
 
 		if (method==POST || method==AUTO&&data.size()) {
 			char s[30];
-			sprintf(s,"Content-Length: %zd\r\n", data.size());
+			sprintf_s(s,"Content-Length: %zd\r\n", data.size());
 			soc.write(s);
 			soc.write("Content-Type: application/x-www-form-urlencoded\r\n");
 		}
