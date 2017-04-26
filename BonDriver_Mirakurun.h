@@ -1,11 +1,9 @@
 ﻿#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-#include <tchar.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <InitGuid.h>
 #include "IBonDriver2.h"
-#include "binzume\socket.h"
 #include "binzume\http.h"
 #include "picojson\picojson.h"
 using namespace std;
@@ -40,11 +38,11 @@ static char g_ServerHost[MAX_HOST_LEN];
 static char g_ServerPort[MAX_PORT_LEN];
 static int g_DecodeB25;
 static int g_Priority;
+static int g_Service_Split;
 picojson::value g_Channel_JSON;
 static int g_MagicPacket_Enable;
 static char g_MagicPacket_TargetMAC[18];
 static char g_MagicPacket_TargetIP[16];
-static TCHAR g_Space_Set[4][4];
 #define MAGICPACKET_WAIT_SECONDS 20
 
 class CBonTuner : public IBonDriver2
@@ -141,7 +139,7 @@ protected:
 	float m_fBitRate;
 
 	void CalcBitRate();
-	void GetApiChannels(picojson::value *json_array);
+	void GetApiChannels(picojson::value *json_array, int service_split);
 	DWORD m_dwRecvBytes;
 	DWORD m_dwLastCalcTick;
 	ULONGLONG m_u64RecvBytes;
