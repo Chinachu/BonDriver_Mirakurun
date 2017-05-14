@@ -50,6 +50,7 @@ static int Init(HMODULE hModule)
 
 	g_DecodeB25 = GetPrivateProfileInt(L"GLOBAL", L"DECODE_B25", 0, g_IniFilePath);
 	g_Priority = GetPrivateProfileInt(L"GLOBAL", L"PRIORITY", 0, g_IniFilePath);
+	g_Service_Split = GetPrivateProfileInt(L"GLOBAL", L"SERVICE_SPLIT", 0, g_IniFilePath);
 
 	setlocale(LC_ALL, "japanese");
 
@@ -196,7 +197,7 @@ CBonTuner::~CBonTuner()
 void CBonTuner::InitChannel()
 {
 	// Mirakurun APIよりchannel取得
-	GetApiChannels(&g_Channel_JSON);
+	GetApiChannels(&g_Channel_JSON, g_Service_Split);
 	if (g_Channel_JSON.is<picojson::null>()) {
 		return;
 	}
@@ -213,7 +214,13 @@ void CBonTuner::InitChannel()
 		}
 		picojson::object& channel_obj = g_Channel_JSON.get(i).get<picojson::object>();
 		const char *type;
-		type = channel_obj["type"].get<std::string>().c_str();
+		if (g_Service_Split == 1) {
+			picojson::object& channel_detail = channel_obj["channel"].get<picojson::object>();
+			type = channel_detail["type"].get<std::string>().c_str();
+		}
+		else {
+			type = channel_obj["type"].get<std::string>().c_str();
+		}
 		if (!g_pType[0]) {
 			int len = (int)strlen(type) + 1;
 			g_pType[0] = (char *)malloc(len);
@@ -270,15 +277,6 @@ const BOOL CBonTuner::OpenTuner()
 			int countdown = 0;
 			for (countdown = 0; countdown < MAGICPACKET_WAIT_SECONDS; countdown++) {
 				try {
-					char serverRequest[256];
-
-					WCHAR tmpServerRequest[256];
-
-					wsprintf(tmpServerRequest, L"GET / HTTP/1.0\r\n\r\n");
-
-					size_t i;
-					wcstombs_s(&i, serverRequest, tmpServerRequest, sizeof(serverRequest));
-
 					struct addrinfo hints;
 					struct addrinfo* res = NULL;
 					struct addrinfo* ai;
@@ -318,6 +316,7 @@ const BOOL CBonTuner::OpenTuner()
 						throw 1UL;
 					}
 
+					const char serverRequest[] = "GET / HTTP/1.0\r\n\r\n";
 					if (send(m_sock, serverRequest, (int)strlen(serverRequest), 0) < 0) {
 						TCHAR szDebugOut[128];
 						::wsprintf(szDebugOut, TEXT("%s: CBonTuner::OpenTuner() send error %d\n"), TUNER_NAME, WSAGetLastError());
@@ -516,7 +515,6 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
 void CBonTuner::PurgeTsStream()
 {
 	// バッファから取り出し可能データをパージする
-
 	::EnterCriticalSection(&m_CriticalSection);
 	m_pIoGetReq = m_pIoPopReq;
 	m_dwReadyReqNum = 0;
@@ -806,8 +804,17 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 
 	const char *type;
 	const char *channel;
-	type = channel_obj["type"].get<std::string>().c_str();
-	channel = channel_obj["channel"].get<std::string>().c_str();
+	char serviceId[6];
+	if (g_Service_Split == 1) {
+		picojson::object& channel_detail = channel_obj["channel"].get<picojson::object>();
+		type = channel_detail["type"].get<std::string>().c_str();
+		channel = channel_detail["channel"].get<std::string>().c_str();
+		sprintf_s(serviceId, "%u", (DWORD)channel_obj["serviceId"].get<double>());
+	}
+	else {
+		type = channel_obj["type"].get<std::string>().c_str();
+		channel = channel_obj["channel"].get<std::string>().c_str();
+	}
 
 	// 一旦クローズ
 	CloseTuner();
@@ -829,7 +836,12 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
 		char serverRequest[256];
 
 		// URL生成
-		sprintf_s(url, "/api/channels/%s/%s/stream?decode=%d", type, channel, g_DecodeB25);
+		if (g_Service_Split == 1) {
+			sprintf_s(url, "/api/channels/%s/%s/services/%s/stream?decode=%d", type, channel, serviceId, g_DecodeB25);
+		}
+		else {
+			sprintf_s(url, "/api/channels/%s/%s/stream?decode=%d", type, channel, g_DecodeB25);
+		}
 		sprintf_s(serverRequest, "GET %s HTTP/1.0\r\nX-Mirakurun-Priority: %d\r\n\r\n", url, g_Priority);
 
 		struct addrinfo hints;
@@ -955,11 +967,17 @@ void CBonTuner::CalcBitRate()
 	return;
 }
 
-void CBonTuner::GetApiChannels(picojson::value* channel_json)
+void CBonTuner::GetApiChannels(picojson::value* channel_json, int service_split)
 {
 	HttpClient client;
 	char url[512];
-	sprintf_s(url, "http://%s:%s/api/channels", g_ServerHost, g_ServerPort);
+	sprintf_s(url, "http://%s:%s/api/", g_ServerHost, g_ServerPort);
+	if (service_split == 1) {
+		strcat_s(url, "services");
+	}
+	else {
+		strcat_s(url, "channels");
+	}
 	HttpResponse response = client.get(url);
 
 	picojson::value v;
