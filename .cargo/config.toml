@@ -1,7 +1,0 @@
-# MSVC CRT を静的リンクする。
-# 既定では生成 DLL が vcruntime140.dll / ucrtbase.dll に動的依存するが、
-# ホスト(TVTest)プロセス内の CRT 初期化状態やバージョン差異と衝突して
-# STATUS_STACK_BUFFER_OVERRUN (0xC0000409) を起こし得る。静的リンクで
-# この外部依存を排除し、DLL 単体で完結させる。
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
