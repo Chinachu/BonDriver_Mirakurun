@@ -83,6 +83,11 @@ struct IBonDriver2Vtbl {
     set_channel_2: extern "C" fn(*mut BonObject, u32, u32) -> BOOL,
     get_cur_space: extern "C" fn(*mut BonObject) -> u32,
     get_cur_channel: extern "C" fn(*mut BonObject) -> u32,
+    // IBonDriver2 末尾で再宣言された Release。
+    // C++(MSVC)では基底 IBonDriver の Release とは別の vtable スロットになるため、
+    // ホスト(TVTest)は IBonDriver2* 経由でこの末尾スロットの Release を呼ぶ。
+    // ここを欠くと vtable 範囲外を関数として実行し 0xC0000409 で即死する。
+    release2: extern "C" fn(*mut BonObject),
 }
 
 /// CreateBonDriver が返すオブジェクト。
@@ -111,6 +116,7 @@ static VTABLE: IBonDriver2Vtbl = IBonDriver2Vtbl {
     set_channel_2: thunk_set_channel_2,
     get_cur_space: thunk_get_cur_space,
     get_cur_channel: thunk_get_cur_channel,
+    release2: thunk_release,
 };
 
 // ---- thunk: vtable から Rust メソッドへの橋渡し ------------------------
@@ -250,7 +256,9 @@ pub extern "C" fn CreateBonDriver() -> *mut c_void {
         // チャンネル情報を取得する(元実装の InitChannel 相当)。
         if let Some(cfg) = CONFIG.get() {
             let ch = Channels::fetch(cfg);
-            *CHANNELS.write().unwrap() = Some(ch);
+            if let Ok(mut guard) = CHANNELS.write() {
+                *guard = Some(ch);
+            }
         }
 
         let tuner = Box::into_raw(Box::new(Tuner::new()));
