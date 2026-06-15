@@ -15,9 +15,6 @@ pub struct Config {
     pub decode_b25: i32,
     pub priority: i32,
     pub service_split: i32,
-    pub magicpacket_enable: bool,
-    pub magicpacket_mac: [u8; 6],
-    pub magicpacket_ip: String,
 }
 
 impl Config {
@@ -34,31 +31,13 @@ impl Config {
         let text = String::from_utf8_lossy(&text);
         let ini = Ini::parse(&text);
 
-        let mut mac = [0u8; 6];
-        let magicpacket_enable = ini.get_int("GLOBAL", "MAGICPACKET_ENABLE", 0) != 0;
-        if magicpacket_enable {
-            let mac_str =
-                ini.get_string("GLOBAL", "MAGICPACKET_TARGETMAC", "00:00:00:00:00:00");
-            parse_mac(&mac_str, &mut mac);
-        }
-
         Some(Config {
             server_host: ini.get_string("GLOBAL", "SERVER_HOST", "localhost"),
             server_port: ini.get_string("GLOBAL", "SERVER_PORT", "8888"),
             decode_b25: ini.get_int("GLOBAL", "DECODE_B25", 0),
             priority: ini.get_int("GLOBAL", "PRIORITY", 0),
             service_split: ini.get_int("GLOBAL", "SERVICE_SPLIT", 0),
-            magicpacket_enable,
-            magicpacket_mac: mac,
-            magicpacket_ip: ini.get_string("GLOBAL", "MAGICPACKET_TARGETIP", "0.0.0.0"),
         })
-    }
-}
-
-/// "00:11:22:33:44:55" 形式のMACアドレスを6バイトへ変換する。
-fn parse_mac(s: &str, out: &mut [u8; 6]) {
-    for (i, part) in s.split(':').take(6).enumerate() {
-        out[i] = u8::from_str_radix(part.trim(), 16).unwrap_or(0);
     }
 }
 

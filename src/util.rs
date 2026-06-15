@@ -25,9 +25,6 @@ pub const ASYNCBUFFSIZE: usize = (0x0020_0000 / TSDATASIZE) * 2;
 /// ビットレート計算間隔(ms)。
 pub const BITRATE_CALC_TIME_MS: u128 = 500;
 
-/// MagicPacket送出後にサーバ起動を待つ秒数。
-pub const MAGICPACKET_WAIT_SECONDS: u64 = 20;
-
 /// UTF-8文字列を NUL 終端の UTF-16(ワイド文字列) に変換する。
 pub fn to_wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()

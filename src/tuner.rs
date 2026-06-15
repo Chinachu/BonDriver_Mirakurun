@@ -8,16 +8,15 @@
 
 use std::collections::VecDeque;
 use std::io::{Read, Write};
-use std::net::{Shutdown, TcpStream, UdpSocket};
+use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use crate::config::Config;
 use crate::util::{
-    to_wide, ASYNCBUFFSIZE, BITRATE_CALC_TIME_MS, FALSE, MAGICPACKET_WAIT_SECONDS, TRUE,
-    TSDATASIZE, TUNER_NAME, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    to_wide, ASYNCBUFFSIZE, BITRATE_CALC_TIME_MS, FALSE, TRUE, TSDATASIZE, TUNER_NAME,
+    WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use crate::{with_channels, CONFIG};
 
@@ -93,14 +92,7 @@ impl Tuner {
             return FALSE;
         }
 
-        if !self.open {
-            if let Some(cfg) = CONFIG.get() {
-                if cfg.magicpacket_enable && !self.wake_on_lan(cfg) {
-                    return FALSE;
-                }
-            }
-            self.open = true;
-        }
+        self.open = true;
         TRUE
     }
 
@@ -217,6 +209,8 @@ impl Tuner {
                     *premain = remain;
                 }
                 None => {
+                    // データ無し。ホストが *ppdst を参照しても安全なよう null を返す。
+                    *ppdst = std::ptr::null_mut();
                     *psize = 0;
                     *premain = 0;
                 }
@@ -390,35 +384,6 @@ impl Tuner {
                 ((bytes as f64 * 8.0 * 1000.0) / (span as f64 * 1024.0 * 1024.0)) as f32;
             self.last_calc = Instant::now();
         }
-    }
-
-    /// MagicPacket(WOL)送出とサーバ起動待ち。
-    fn wake_on_lan(&self, cfg: &Config) -> bool {
-        // マジックパケット生成: 0xFF * 6 + MAC * 16。
-        let mut packet = [0u8; 102];
-        for b in packet.iter_mut().take(6) {
-            *b = 0xFF;
-        }
-        for i in 0..16 {
-            packet[6 + i * 6..6 + i * 6 + 6].copy_from_slice(&cfg.magicpacket_mac);
-        }
-
-        if let Ok(sock) = UdpSocket::bind("0.0.0.0:0") {
-            let _ = sock.set_broadcast(true);
-            let _ = sock.send_to(&packet, (cfg.magicpacket_ip.as_str(), 9));
-        }
-
-        // サーバが起動してTCP接続できるまで待つ。
-        for _ in 0..MAGICPACKET_WAIT_SECONDS {
-            if let Ok(mut s) =
-                TcpStream::connect((cfg.server_host.as_str(), cfg.port_num()))
-            {
-                let _ = s.write_all(b"GET / HTTP/1.0\r\n\r\n");
-                return true;
-            }
-            std::thread::sleep(Duration::from_secs(1));
-        }
-        false
     }
 }
 

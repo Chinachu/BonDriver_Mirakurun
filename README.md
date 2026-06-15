@@ -53,9 +53,6 @@ cargo +stable-x86_64-pc-windows-gnullvm build --release --target x86_64-pc-windo
 | `DECODE_B25` | B25デコード(1=有効) |
 | `PRIORITY` | Mirakurun の優先度 |
 | `SERVICE_SPLIT` | サービス単位で分割(1=有効) |
-| `MAGICPACKET_ENABLE` | WOL マジックパケット送出(1=有効) |
-| `MAGICPACKET_TARGETMAC` | 対象MACアドレス |
-| `MAGICPACKET_TARGETIP` | 対象ブロードキャストIP |
 
 ## 実装メモ
 

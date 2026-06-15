@@ -6,18 +6,18 @@ rem  Usage:
 rem    build.bat              build with the default target
 rem    build.bat <target>     build with the given Rust target
 rem
-rem  Default target: x86_64-pc-windows-gnullvm (LLVM-MinGW).
-rem  On a machine with the MSVC toolchain you can use:
-rem    build.bat x86_64-pc-windows-msvc
+rem  Default target: x86_64-pc-windows-msvc (MSVC).
+rem  On a machine with the LLVM-MinGW toolchain you can use:
+rem    build.bat x86_64-pc-windows-gnu
 rem
 rem  Output: dist\BonDriver_Mirakurun.dll and dist\BonDriver_Mirakurun.ini
 rem ====================================================================
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-rem Decide the target (default: gnullvm / LLVM-MinGW)
+rem Decide the target (default: msvc / MSVC).
 set "TARGET=%~1"
-if "%TARGET%"=="" set "TARGET=x86_64-pc-windows-gnullvm"
+if "%TARGET%"=="" set "TARGET=x86_64-pc-windows-msvc"
 
 rem Matching toolchain name
 set "TOOLCHAIN=stable-%TARGET%"
