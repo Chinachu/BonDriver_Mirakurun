@@ -1,0 +1,26 @@
+[package]
+name = "bondriver_mirakurun"
+version = "2.0.0"
+edition = "2024"
+description = "BonDriver for Mirakurun (Rust port of the original C++ implementation)"
+license = "MIT"
+
+# 出力されるDLL名を BonDriver_Mirakurun.dll に固定する
+[lib]
+name = "BonDriver_Mirakurun"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json = "1"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
