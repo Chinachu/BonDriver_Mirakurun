@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://aka.ms/configuration-dsc-schema/0.2
+#
+# BonDriver_Mirakurun - MSVC build environment (winget configure)
+#
+# Installs the toolchain required to build with the
+# x86_64-pc-windows-msvc Rust target:
+#   - Visual Studio 2022 Build Tools
+#   - Desktop C++ workload (VCTools) + Windows 11 SDK
+#   - Rustup (Rust toolchain manager)
+#
+# Apply with:
+#   winget configure -f configuration.dsc.yaml
+# or simply run setup-env.bat.
+properties:
+  configurationVersion: 0.2.0
+
+  assertions:
+    - resource: Microsoft.Windows.Developer/OsVersion
+      directives:
+        description: Verify minimum OS version requirement
+        allowPrerelease: true
+      settings:
+        MinVersion: '10.0.22000'
+
+  resources:
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: vsBuildTools
+      directives:
+        description: Install Visual Studio 2022 Build Tools
+        allowPrerelease: true
+      settings:
+        id: Microsoft.VisualStudio.2022.BuildTools
+        source: winget
+
+    - resource: Microsoft.VisualStudio.DSC/VSComponents
+      dependsOn:
+        - vsBuildTools
+      directives:
+        description: Install the C++ build tools workload and Windows SDK
+        allowPrerelease: true
+      settings:
+        productId: Microsoft.VisualStudio.Product.BuildTools
+        channelId: VisualStudio.17.Release
+        components:
+          - Microsoft.VisualStudio.Workload.VCTools
+          - Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+          - Microsoft.VisualStudio.Component.Windows11SDK.22621
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: rustup
+      directives:
+        description: Install Rustup (Rust toolchain manager)
+        allowPrerelease: true
+      settings:
+        id: Rustlang.Rustup
+        source: winget
