@@ -66,16 +66,23 @@ cargo +stable-x86_64-pc-windows-msvc build --release --target x86_64-pc-windows-
 | キー | 既定値 | 説明 |
 | --- | --- | --- |
 | `SERVER_HOST` | `localhost` | Mirakurun のホスト名 |
-| `SERVER_PORT` | `40772` | Mirakurun のポート番号 |
+| `SERVER_PORT` | `8888` | Mirakurun のポート番号(付属の ini では `40772` を設定) |
 | `DECODE_B25` | `0` | B25 デコード(1=有効) |
 | `PRIORITY` | `0` | Mirakurun の優先度 |
 | `SERVICE_SPLIT` | `0` | サービス単位で分割(1=有効) |
 
 ## 実装メモ
 
-- JSON 解析は `serde_json` を使用(オリジナルの picojson 置き換え)。
+- vtable は MSVC(cl.exe x64)が実際に生成するスロット順に完全一致させています
+  (同名オーバーロードの逆順配置、`IBonDriver2` で再宣言される `Release` の
+  基底スロット共有を含む全17スロット)。
+- TVTest(LibISDB)は `CreateBonDriver` の戻り値に `dynamic_cast<IBonDriver2*>`
+  を実行するため、MSVC 互換の RTTI 構造体(Complete Object Locator 等)を
+  実行時に構築し vtable に付加しています(`src/rtti.rs`)。
 - TS 受信はオリジナルの Push/Pop 2スレッド + オーバーラップド I/O を、
   1本の受信スレッド + `Mutex`/`Condvar` キューという等価構成へ整理しています。
+  ストリーム先頭の HTTP レスポンスヘッダは TS データに混入させず読み飛ばします。
+- JSON 解析は `serde_json` を使用(オリジナルの picojson 置き換え)。
 - FFI(`extern "C"`)境界を Rust の unwind が越えないよう、リリースビルドでは
   `panic = "abort"` を指定しています。
 
