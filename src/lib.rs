@@ -18,6 +18,7 @@ compile_error!(
 mod channels;
 mod config;
 mod http;
+mod rtti;
 mod tuner;
 mod util;
 
@@ -59,8 +60,14 @@ pub(crate) fn with_channels<R>(f: impl FnOnce(&Channels) -> R) -> R {
 
 // ---- IBonDriver2 vtable レイアウト -------------------------------------
 
-/// IBonDriver2 の vtable。宣言順は C++ の IBonDriver -> IBonDriver2 の
-/// 仮想関数並びと完全に一致させること(ABI互換のため)。
+/// IBonDriver2 の vtable。並び順は MSVC が実際に生成するスロット順
+/// (cl.exe x64 での実測)と完全に一致させること(ABI互換のため)。
+///
+/// 注意: MSVC は同名オーバーロードの仮想関数を「宣言と逆順」で vtable に
+/// 配置する。IBonDriver の GetTsStream は宣言順が (コピー版, ポインタ版) だが、
+/// vtable 上は slot6=ポインタ版, slot7=コピー版 になる。
+/// また IBonDriver2 末尾で再宣言される Release は基底と同一スロット
+/// (slot9)を共有し、追加スロットは作られない(全17スロット)。
 #[repr(C)]
 struct IBonDriver2Vtbl {
     // IBonDriver
@@ -70,9 +77,11 @@ struct IBonDriver2Vtbl {
     get_signal_level: extern "C" fn(*mut BonObject) -> f32,
     wait_ts_stream: extern "C" fn(*mut BonObject, u32) -> u32,
     get_ready_count: extern "C" fn(*mut BonObject) -> u32,
-    get_ts_stream: extern "C" fn(*mut BonObject, *mut u8, *mut u32, *mut u32) -> BOOL,
+    // slot6: GetTsStream(BYTE**,...) ポインタ版(オーバーロード逆順配置)
     get_ts_stream_ptr:
         extern "C" fn(*mut BonObject, *mut *mut u8, *mut u32, *mut u32) -> BOOL,
+    // slot7: GetTsStream(BYTE*,...) コピー版
+    get_ts_stream: extern "C" fn(*mut BonObject, *mut u8, *mut u32, *mut u32) -> BOOL,
     purge_ts_stream: extern "C" fn(*mut BonObject),
     release: extern "C" fn(*mut BonObject),
     // IBonDriver2
@@ -83,11 +92,6 @@ struct IBonDriver2Vtbl {
     set_channel_2: extern "C" fn(*mut BonObject, u32, u32) -> BOOL,
     get_cur_space: extern "C" fn(*mut BonObject) -> u32,
     get_cur_channel: extern "C" fn(*mut BonObject) -> u32,
-    // IBonDriver2 末尾で再宣言された Release。
-    // C++(MSVC)では基底 IBonDriver の Release とは別の vtable スロットになるため、
-    // ホスト(TVTest)は IBonDriver2* 経由でこの末尾スロットの Release を呼ぶ。
-    // ここを欠くと vtable 範囲外を関数として実行し 0xC0000409 で即死する。
-    release2: extern "C" fn(*mut BonObject),
 }
 
 /// CreateBonDriver が返すオブジェクト。
@@ -105,8 +109,8 @@ static VTABLE: IBonDriver2Vtbl = IBonDriver2Vtbl {
     get_signal_level: thunk_get_signal_level,
     wait_ts_stream: thunk_wait_ts_stream,
     get_ready_count: thunk_get_ready_count,
-    get_ts_stream: thunk_get_ts_stream,
     get_ts_stream_ptr: thunk_get_ts_stream_ptr,
+    get_ts_stream: thunk_get_ts_stream,
     purge_ts_stream: thunk_purge_ts_stream,
     release: thunk_release,
     get_tuner_name: thunk_get_tuner_name,
@@ -116,8 +120,32 @@ static VTABLE: IBonDriver2Vtbl = IBonDriver2Vtbl {
     set_channel_2: thunk_set_channel_2,
     get_cur_space: thunk_get_cur_space,
     get_cur_channel: thunk_get_cur_channel,
-    release2: thunk_release,
 };
+
+/// RTTI 付きブロックへ複製した vtable(TVTest の dynamic_cast 用)。
+/// 一度構築したら DLL の寿命中使い回す。
+static VTABLE_WITH_RTTI: OnceLock<VtblPtr> = OnceLock::new();
+
+/// 生ポインタを OnceLock に入れるためのラッパ。
+/// 参照先は不変データのためスレッド間で共有しても安全。
+struct VtblPtr(*const IBonDriver2Vtbl);
+unsafe impl Send for VtblPtr {}
+unsafe impl Sync for VtblPtr {}
+
+/// dynamic_cast 可能な vtable ポインタを取得する。
+fn vtable_ptr() -> *const IBonDriver2Vtbl {
+    VTABLE_WITH_RTTI
+        .get_or_init(|| {
+            let p = unsafe {
+                rtti::build_vtable_with_rtti(
+                    &VTABLE as *const IBonDriver2Vtbl as *const u8,
+                    std::mem::size_of::<IBonDriver2Vtbl>(),
+                )
+            };
+            VtblPtr(p as *const IBonDriver2Vtbl)
+        })
+        .0
+}
 
 // ---- thunk: vtable から Rust メソッドへの橋渡し ------------------------
 
@@ -263,7 +291,7 @@ pub extern "C" fn CreateBonDriver() -> *mut c_void {
 
         let tuner = Box::into_raw(Box::new(Tuner::new()));
         let obj = Box::into_raw(Box::new(BonObject {
-            vtable: &VTABLE,
+            vtable: vtable_ptr(),
             tuner,
         }));
         INSTANCE.store(obj, Ordering::SeqCst);
