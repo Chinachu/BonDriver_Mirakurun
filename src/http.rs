@@ -126,7 +126,7 @@ fn content_length(header: &str) -> Option<usize> {
 }
 
 /// haystack 中の needle の開始位置を探す。
-fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+pub(crate) fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {
         return None;
     }

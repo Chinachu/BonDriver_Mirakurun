@@ -394,19 +394,43 @@ impl Drop for Tuner {
 }
 
 /// 受信スレッド本体。ソケットからTSデータを読み続けてキューへ積む。
+/// ストリーム先頭のHTTPレスポンスヘッダはTSデータに混入させず読み飛ばす。
 fn reader_loop(mut stream: TcpStream, shared: Arc<Shared>) {
+    /// ヘッダとして受け付ける最大サイズ。超えたら異常応答とみなす。
+    const MAX_HEADER_SIZE: usize = 64 * 1024;
+
     let mut buf = vec![0u8; TSDATASIZE];
+    let mut header = Vec::new();
+    let mut in_header = true;
     while shared.running.load(Ordering::SeqCst) {
         match stream.read(&mut buf) {
             Ok(0) => break, // 切断
             Ok(n) => {
-                shared.recv_bytes.fetch_add(n as u64, Ordering::SeqCst);
+                let chunk: Vec<u8> = if in_header {
+                    header.extend_from_slice(&buf[..n]);
+                    match crate::http::find_subslice(&header, b"\r\n\r\n") {
+                        Some(pos) => {
+                            in_header = false;
+                            let body = header[pos + 4..].to_vec();
+                            header = Vec::new();
+                            if body.is_empty() {
+                                continue;
+                            }
+                            body
+                        }
+                        None if header.len() > MAX_HEADER_SIZE => break,
+                        None => continue, // まだヘッダの途中
+                    }
+                } else {
+                    buf[..n].to_vec()
+                };
+                shared.recv_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
                 let mut guard = shared.queue.lock().unwrap();
                 // バッファ上限を超えたら古いものから捨てる。
                 while guard.len() >= ASYNCBUFFSIZE {
                     guard.pop_front();
                 }
-                guard.push_back(buf[..n].to_vec());
+                guard.push_back(chunk);
                 drop(guard);
                 shared.cond.notify_one();
             }
